@@ -1,6 +1,6 @@
 export const authConfig = {
   jwt: {
-    secret: "rodrigo",
+    secret: process.env.JWT_SECRET ?? "fallback_dev",
     expiresIn: "1d",
   },
 }
