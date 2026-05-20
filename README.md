@@ -43,13 +43,13 @@ Refund/
 Api/
 ├── prisma/
 │   ├── schema.prisma         # Modelos do banco de dados
-│   ├── dev.db                # Banco SQLite local
+│   ├── dev.db                # Banco SQLite local (não versionado)
 │   └── migrations/           # Histórico de migrações
 ├── src/
 │   ├── app.ts                # Configuração do Express
 │   ├── server.ts             # Inicialização do servidor
 │   ├── configs/
-│   │   ├── auth.ts           # Configuração JWT (secret + expiração)
+│   │   ├── auth.ts           # Configuração JWT (secret via variável de ambiente)
 │   │   └── upload.ts         # Configuração Multer (tamanho, tipos aceitos)
 │   ├── controllers/
 │   │   ├── users-controller.ts
@@ -59,9 +59,9 @@ Api/
 │   ├── database/
 │   │   └── prisma.ts         # Instância do Prisma Client
 │   ├── middlewares/
-│   │   ├── ensure-authenticated.ts     # Verifica token JWT
+│   │   ├── ensure-authenticated.ts      # Verifica token JWT
 │   │   ├── verify-user-Authorization.ts # Verifica role do usuário
-│   │   └── error-handling.ts           # Tratamento global de erros
+│   │   └── error-handling.ts            # Tratamento global de erros
 │   ├── providers/
 │   │   └── disk-storage.ts   # Salva/deleta arquivos no disco
 │   ├── routes/
@@ -74,8 +74,10 @@ Api/
 │   │   └── express.d.ts      # Extensão do tipo Request (user: { id, role })
 │   └── utils/
 │       └── AppError.ts       # Classe de erros personalizados
-└── tmp/
-    └── uploads/              # Comprovantes enviados pelos funcionários
+├── tmp/
+│   └── uploads/              # Comprovantes enviados pelos funcionários
+├── .env.example              # Modelo de variáveis de ambiente
+└── .gitignore
 ```
 
 ### Banco de Dados
@@ -103,6 +105,17 @@ Refunds
 ├── createdAt  DateTime
 └── updatedAt  DateTime?
 ```
+
+### Variáveis de Ambiente
+
+Crie um arquivo `.env` na pasta `Api/` com base no `.env.example`:
+
+```env
+PORT=3333
+JWT_SECRET=sua_chave_secreta_aqui
+```
+
+> ⚠️ Nunca suba o `.env` para o repositório. O arquivo `dev.db` também é ignorado — após clonar, rode as migrações para recriar o banco localmente.
 
 ### Rotas da API
 
@@ -150,8 +163,13 @@ npm install
 ```
 
 **2. Configure as variáveis de ambiente:**
-
-> A API usa SQLite com arquivo local, portanto **não precisa de `DATABASE_URL` no `.env`** — o banco fica em `prisma/dev.db`. O `authConfig` já está embutido em `src/configs/auth.ts`.
+```bash
+cp .env.example .env
+```
+Abra o `.env` e preencha o `JWT_SECRET` com uma chave segura. Você pode gerar uma assim:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 **3. Execute as migrações do banco:**
 ```bash
@@ -225,12 +243,24 @@ Web/
 │   │   ├── EmploeeRoutes.tsx    # Rotas do funcionário
 │   │   └── ManagerRoutes.tsx    # Rotas do gestor
 │   ├── services/
-│   │   └── api.ts               # Instância Axios (baseURL: localhost:3333)
+│   │   └── api.ts               # Instância Axios (baseURL via VITE_API_URL)
 │   └── utils/
 │       ├── categories.ts        # Mapa categoria → nome PT-BR + ícone SVG
 │       ├── formatCurrency.ts    # Formata valores como moeda
 │       └── classMerge.ts        # Utilitário clsx + tailwind-merge
+├── .env.example                 # Modelo de variáveis de ambiente
+└── .gitignore
 ```
+
+### Variáveis de Ambiente
+
+Crie um arquivo `.env` na pasta `Web/` com base no `.env.example`:
+
+```env
+VITE_API_URL=http://localhost:3333
+```
+
+> O frontend usa `import.meta.env.VITE_API_URL` para se conectar à API. Certifique-se de que a URL e a porta batem com as configurações do backend.
 
 ### Fluxo de Autenticação
 
@@ -245,14 +275,14 @@ Ao carregar a aplicação, o contexto restaura a sessão e injeta o token no hea
 O roteador principal detecta o `role` do usuário logado e renderiza o conjunto de rotas correto:
 
 ```
-Não autenticado  →  AuthRoutes    →  /        (SignIn)
-                                     /signup  (SignUp)
+Não autenticado  →  AuthRoutes     →  /           (SignIn)
+                                       /signup     (SignUp)
 
-employee         →  EmployeeRoutes →  /        (formulário de solicitação)
-                                      /confirm  (confirmação de envio)
+employee         →  EmployeeRoutes →  /           (formulário de solicitação)
+                                       /confirm    (confirmação de envio)
 
 manager          →  ManagerRoutes  →  /           (Dashboard com listagem)
-                                      /refund/:id  (visualização de solicitação)
+                                       /refund/:id (visualização de solicitação)
 ```
 
 ### Categorias de Despesa
@@ -273,31 +303,45 @@ cd Web
 npm install
 ```
 
-**2. Inicie o servidor de desenvolvimento:**
+**2. Configure as variáveis de ambiente:**
+```bash
+cp .env.example .env
+```
+O valor padrão `http://localhost:3333` já aponta para a API local.
+
+**3. Inicie o servidor de desenvolvimento:**
 ```bash
 npm run dev
 ```
 
 O frontend ficará disponível em `http://localhost:5173`.
 
-> ⚠️ Certifique-se de que a API já está rodando em `http://localhost:3333` antes de acessar o frontend.
+> ⚠️ Certifique-se de que a API já está rodando antes de acessar o frontend.
 
 ---
 
 ## 🚀 Rodando o Projeto Completo
 
-Em dois terminais separados:
-
+**1. Clone o repositório:**
 ```bash
-# Terminal 1 — API
+git clone <url-do-repositorio>
+cd Project_FullStack_Site_Refund
+```
+
+**2. Configure e suba a API (Terminal 1):**
+```bash
 cd Api
 npm install
+cp .env.example .env   # preencha o JWT_SECRET
 npx prisma migrate dev
 npm run dev
+```
 
-# Terminal 2 — Frontend
+**3. Configure e suba o Frontend (Terminal 2):**
+```bash
 cd Web
 npm install
+cp .env.example .env   # VITE_API_URL=http://localhost:3333
 npm run dev
 ```
 
@@ -325,6 +369,8 @@ Acesse: `http://localhost:5173`
 
 - Senhas armazenadas com **bcrypt** (salt rounds: 8)
 - Autenticação via **JWT** com expiração de 1 dia
+- Secret JWT carregado via **variável de ambiente** (`JWT_SECRET`) — nunca exposto no código
 - Rotas privadas protegidas pelos middlewares `ensureAuthenticated` e `verifyUserAuthorization`
 - Validação de entrada em todos os endpoints com **Zod**
 - Upload restrito a arquivos `JPEG/JPG/PNG` com limite de tamanho de **1MB**
+- Arquivos sensíveis (`.env`, `dev.db`, uploads) ignorados pelo `.gitignore`
